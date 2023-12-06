@@ -21,11 +21,6 @@ if right_file is not None:
 
 properties_to_ignore = st.multiselect("Properties to ignore:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema'], default=['created_at'])
 
-
-sort_sources = {
-    "nodes": ['sources']
-}
-
 if left_file and right_file:
     for node in ["nodes", "macros", "disabled", "exposures", "macros", "metrics", "semantic_models", "sources"]:
         for key in properties_to_ignore:
