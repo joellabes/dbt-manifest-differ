@@ -1,6 +1,9 @@
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 import json
+import jsondiff
+import pandas as pd
+from functions.flatten import flatten_keys
 
 # Minimal viable imports from dbt-core
 from dbt.contracts.graph.manifest import WritableManifest
@@ -30,7 +33,7 @@ state_options = [
     "modified.contract"
 ]
 state_method = st.selectbox(label="State comparison method:", options=state_options)
-properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum'], default=['created_at', 'checksum'])
+properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code'], default=['created_at', 'checksum'])
 
 def load_manifest(file: UploadedFile) -> WritableManifest:
     data = json.load(file)
@@ -49,6 +52,16 @@ if left_file and right_file:
     included_nodes = set(left_manifest.nodes.keys())
     previous_state = MockPreviousState(right_manifest)
     state_comparator = StateSelectorMethod(left_manifest, previous_state, "")
+
+    state_inclusion_reasons_by_node = {}
+    for state_option in state_options:
+        results = state_comparator.search(included_nodes, state_option)
+        for node in results:
+            if node in state_inclusion_reasons_by_node:
+                state_inclusion_reasons_by_node[node].append(state_option)
+            else:
+                state_inclusion_reasons_by_node[node] = [state_option]
+
     selected_nodes = list(state_comparator.search(included_nodes, state_method))
     
     st.header("Modified macros")
@@ -78,14 +91,18 @@ if left_file and right_file:
         if left_node and right_node:
             left_dict = left_node.to_dict()
             right_dict = right_node.to_dict()
-            diffs = [
-                {"key": k, "left": left_dict[k], "right": right_dict[k]}
+            diffs = {
+                k: jsondiff.diff(left_dict[k], right_dict[k], syntax='symmetric', marshal=True)
                 for k in left_dict if left_dict[k] != right_dict[k] and k not in properties_to_ignore
-            ]
+            }
             st.write(unique_id)
-            if left_node.depends_on.macros:
+            st.write(state_inclusion_reasons_by_node[unique_id])
+            # st.json(jdiff)
+            if left_node.depends_on.macros and state_comparator.modified_macros:
                 st.write(f"Depends on macros: {left_node.depends_on.macros}")
-            st.write(diffs)
+            st.json(diffs, expanded=False)
+            df = pd.DataFrame.from_dict(flatten_keys(diffs)).transpose()
+            st.dataframe(df, hide_index=False)
         elif not left_node:
             st.write(f"{unique_id} is missing in left manifest")
         elif not right_node:
