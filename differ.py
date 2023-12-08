@@ -96,6 +96,7 @@ if left_file and right_file:
                 for k in left_dict if left_dict[k] != right_dict[k] and k not in properties_to_ignore
             }
             st.write(unique_id)
+            st.write("State methods that pick this node up:")
             st.write(state_inclusion_reasons_by_node[unique_id])
             # st.json(jdiff)
             if left_node.depends_on.macros and state_comparator.modified_macros:
