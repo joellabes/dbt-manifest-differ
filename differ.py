@@ -4,6 +4,7 @@ import json
 import jsondiff
 import pandas as pd
 from functions.flatten import flatten_keys
+from functions import tidy
 
 # Minimal viable imports from dbt-core
 from dbt.contracts.graph.manifest import WritableManifest
@@ -23,8 +24,6 @@ right_manifest: WritableManifest = None
 state_options = [
     "modified",
     "new",
-    "old",
-    "unmodified",
     "modified.body",
     "modified.configs",
     "modified.persisted_descriptions",
@@ -34,9 +33,12 @@ state_options = [
 ]
 state_method = st.selectbox(label="State comparison method:", options=state_options)
 properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code'], default=['created_at', 'checksum'])
+skipped_large_seeds = set()
 
 def load_manifest(file: UploadedFile) -> WritableManifest:
     data = json.load(file)
+    data, large_seeds = tidy.remove_large_seeds(data)
+    skipped_large_seeds.update(large_seeds)
     return WritableManifest.upgrade_schema_version(data)
 
 left_file = left_col.file_uploader("First manifest", type='json', help="Pick your left json file")
@@ -53,40 +55,36 @@ if left_file and right_file:
     previous_state = MockPreviousState(right_manifest)
     state_comparator = StateSelectorMethod(left_manifest, previous_state, "")
 
+    if len(skipped_large_seeds) > 0:
+        st.warning(f"Some large seeds couldn't be compared from the manifest alone: {skipped_large_seeds}" )
+
+    state_inclusion_counts = {}
     state_inclusion_reasons_by_node = {}
     for state_option in state_options:
-        results = state_comparator.search(included_nodes, state_option)
+        results = list(state_comparator.search(included_nodes, state_option))
         for node in results:
             if node in state_inclusion_reasons_by_node:
                 state_inclusion_reasons_by_node[node].append(state_option)
             else:
                 state_inclusion_reasons_by_node[node] = [state_option]
+        state_inclusion_counts[state_option] = len((results))
 
+    st.bar_chart(state_inclusion_counts)
     selected_nodes = list(state_comparator.search(included_nodes, state_method))
     
-    st.header("Modified macros")
     if state_comparator.modified_macros:
+        st.header("Modified macros")
         st.write(state_comparator.modified_macros)
-        #macro_diffs = [
-        #    {
-        #        "unique_id": macro_uid,
-        #        "left": left_manifest.macros.get(macro_uid).macro_sql,
-        #        "right": right_manifest.macros.get(macro_uid).macro_sql
-        #    }
-        #    for macro_uid in state_comparator.modified_macros
-        #]
-        #st.write(macro_diffs)
-    else:
-        st.write("No modified macros")
     
     if len(selected_nodes) == 0:
         st.write("No diffs!")
     
-    st.header("Selected nodes")
+    st.header(f"{len(selected_nodes)} Selected node{'s' if len(selected_nodes) != 1 else ''}")
     for unique_id in selected_nodes:
         
         left_node = left_manifest.nodes.get(unique_id)
         right_node = right_manifest.nodes.get(unique_id)
+        st.subheader(unique_id)
         
         if left_node and right_node:
             left_dict = left_node.to_dict()
@@ -95,19 +93,19 @@ if left_file and right_file:
                 k: jsondiff.diff(left_dict[k], right_dict[k], syntax='symmetric', marshal=True)
                 for k in left_dict if left_dict[k] != right_dict[k] and k not in properties_to_ignore
             }
-            st.write(unique_id)
             st.write("State methods that pick this node up:")
-            st.write(state_inclusion_reasons_by_node[unique_id])
-            # st.json(jdiff)
+            st.code(state_inclusion_reasons_by_node[unique_id])
             if left_node.depends_on.macros and state_comparator.modified_macros:
                 st.write(f"Depends on macros: {left_node.depends_on.macros}")
             st.json(diffs, expanded=False)
-            df = pd.DataFrame.from_dict(flatten_keys(diffs)).transpose()
-            st.dataframe(df, hide_index=False)
+            flattened_diff = flatten_keys(diffs)
+            df = pd.DataFrame.from_dict(flattened_diff, orient='index')
+            st.dataframe(df)
         elif not left_node:
-            st.write(f"{unique_id} is missing in left manifest")
+            st.write(f"Missing from left manifest (brand new node)")
         elif not right_node:
-            st.write(f"{unique_id} is missing in right manifest")
+            st.write(f"Missing from right manifest (deleted node)")
+        st.divider()
         
 else:
     st.warning("Upload two manifests to begin comparison", icon="👯")
