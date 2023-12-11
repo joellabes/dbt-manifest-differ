@@ -10,6 +10,14 @@ from functions import tidy
 from dbt.contracts.graph.manifest import WritableManifest
 from dbt.graph.selector_methods import StateSelectorMethod
 
+# To support logging events, mock the 'list' command with default CLI options
+from dbt.cli.flags import Flags
+from dbt.flags import set_flags
+from dbt.cli.types import Command as CliCommand
+
+flags = Flags.from_dict(CliCommand.LIST, {})
+set_flags(flags)
+
 class MockPreviousState:
     def __init__(self, manifest: WritableManifest) -> None:
         self.manifest: Manifest = manifest
@@ -77,7 +85,7 @@ if left_file and right_file:
         st.write(state_comparator.modified_macros)
     
     if len(selected_nodes) == 0:
-        st.write("No diffs!")
+        st.write("No nodes selected!")
     
     st.header(f"{len(selected_nodes)} Selected node{'s' if len(selected_nodes) != 1 else ''}")
     for unique_id in selected_nodes:
