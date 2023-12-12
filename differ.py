@@ -90,8 +90,8 @@ if left_file and right_file:
             left_dict = left_node.to_dict()
             right_dict = right_node.to_dict()
             diffs = {
-                k: jsondiff.diff(left_dict[k], right_dict[k], syntax='symmetric', marshal=True)
-                for k in left_dict if left_dict[k] != right_dict[k] and k not in properties_to_ignore
+                k: jsondiff.diff(left_dict[k], right_dict.get(k, None), syntax='symmetric', marshal=True)
+                for k in left_dict if (k not in right_dict or left_dict[k] != right_dict[k]) and k not in properties_to_ignore
             }
             st.write("State methods that pick this node up:")
             st.code(state_inclusion_reasons_by_node[unique_id])
