@@ -17,6 +17,15 @@ class MockPreviousState:
 st.set_page_config(layout="wide")
 st.title("dbt Manifest Differ")
 
+st.info("""Work out why your models built in a Slim CI run.
+
+Upload your production manifest on the left side, and the manifest from your Slim CI run on the right side. 
+
+False positives in `modified.configs` are likely to be due to `config()` blocks in a node's definition or in its `.yml` resource file. 
+        
+To avoid false positives, define configs in `dbt_project.yml` instead. See [the docs on state comparison](https://docs.getdbt.com/reference/node-selection/state-comparison-caveats#false-positives) for more information.
+""", icon = "💡")
+
 left_col, right_col = st.columns(2)
 left_manifest: WritableManifest = None
 right_manifest: WritableManifest = None
