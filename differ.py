@@ -32,7 +32,7 @@ state_options = [
     "modified.contract"
 ]
 state_method = st.selectbox(label="State comparison method:", options=state_options)
-properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code'], default=['created_at', 'checksum'])
+properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code', 'database', 'relation_name'], default=['created_at', 'checksum', 'database', 'schema', 'relation_name', 'compiled_path', 'root_path'])
 skipped_large_seeds = set()
 
 def load_manifest(file: UploadedFile) -> WritableManifest:
