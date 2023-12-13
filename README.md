@@ -8,5 +8,5 @@ Diff two manifests to work out why something might have been considered modified
 - Run `streamlit run differ.py`
 
 
-Or use the interactive version online: <https://dbt-manifest-differ.streamlit.app>
+Or use the interactive version online: <https://dbt-manifest-diff.streamlit.app>
 
