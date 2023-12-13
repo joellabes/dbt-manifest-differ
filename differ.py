@@ -32,7 +32,7 @@ state_options = [
     "modified.contract"
 ]
 state_method = st.selectbox(label="State comparison method:", options=state_options)
-properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code', 'database', 'relation_name'], default=['created_at', 'checksum', 'database', 'schema', 'relation_name', 'compiled_path', 'root_path'])
+properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code', 'database', 'relation_name'], default=['created_at', 'checksum', 'database', 'schema', 'relation_name', 'compiled_path', 'root_path', 'build_path'])
 skipped_large_seeds = set()
 
 def load_manifest(file: UploadedFile) -> WritableManifest:
@@ -75,10 +75,7 @@ if left_file and right_file:
     if state_comparator.modified_macros:
         st.header("Modified macros")
         st.write(state_comparator.modified_macros)
-    
-    if len(selected_nodes) == 0:
-        st.write("No diffs!")
-    
+        
     st.header(f"{len(selected_nodes)} Selected node{'s' if len(selected_nodes) != 1 else ''}")
     for unique_id in selected_nodes:
         
@@ -89,22 +86,44 @@ if left_file and right_file:
         if left_node and right_node:
             left_dict = left_node.to_dict()
             right_dict = right_node.to_dict()
+            all_keys = set(left_dict.keys()) | set(right_dict.keys())
             diffs = {
-                k: jsondiff.diff(left_dict[k], right_dict.get(k, None), syntax='symmetric', marshal=True)
-                for k in left_dict if (k not in right_dict or left_dict[k] != right_dict[k]) and k not in properties_to_ignore
+                k: jsondiff.diff(
+                    left_dict.get(k, None), 
+                    right_dict.get(k, None), 
+                    syntax='symmetric', 
+                    marshal=True
+                )
+                for k in all_keys 
+                if k not in properties_to_ignore and (
+                    k not in right_dict 
+                    or k not in left_dict 
+                    or left_dict[k] != right_dict[k]
+                )
             }
+            
             st.write("State methods that pick this node up:")
             st.code(state_inclusion_reasons_by_node[unique_id])
+            
             if left_node.depends_on.macros and state_comparator.modified_macros:
                 st.write(f"Depends on macros: {left_node.depends_on.macros}")
+            
+            st.write("JSON tree of diffs:")
             st.json(diffs, expanded=False)
+
+            st.write("Flat table of diffs:")
             flattened_diff = flatten_keys(diffs)
             df = pd.DataFrame.from_dict(flattened_diff, orient='index')
             st.dataframe(df)
+        
         elif not left_node:
             st.write(f"Missing from left manifest (brand new node)")
+        
         elif not right_node:
             st.write(f"Missing from right manifest (deleted node)")
+            st.write("State methods that pick this node up:")
+            st.code(state_inclusion_reasons_by_node[unique_id])
+
         st.divider()
         
 else:
