@@ -10,6 +10,6 @@ def flatten_keys(dictionary, separator="."):
                 for k, v in flatten_keys(value, separator).items()
             )
         else:
-            result[key] = value
+            result[str(key)] = value
 
     return result

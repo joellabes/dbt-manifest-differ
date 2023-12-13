@@ -14,6 +14,7 @@ class MockPreviousState:
     def __init__(self, manifest: WritableManifest) -> None:
         self.manifest: Manifest = manifest
 
+st.set_page_config(layout="wide")
 st.title("dbt Manifest Differ")
 
 left_col, right_col = st.columns(2)
@@ -102,25 +103,34 @@ if left_file and right_file:
                 )
             }
             
-            st.write("State methods that pick this node up:")
+            st.write("##### State selectors that find this node:")
             st.code(state_inclusion_reasons_by_node[unique_id])
             
             if left_node.depends_on.macros and state_comparator.modified_macros:
                 st.write(f"Depends on macros: {left_node.depends_on.macros}")
             
-            st.write("JSON tree of diffs:")
-            st.json(diffs, expanded=False)
+            diff_json, right_full_json = st.columns(2)
 
-            st.write("Flat table of diffs:")
-            flattened_diff = flatten_keys(diffs)
-            df = pd.DataFrame.from_dict(flattened_diff, orient='index')
-            st.dataframe(df)
+            diff_json.write("##### JSON tree of diffs:")
+            diff_json.json(diffs, expanded=False)
+
+            right_full_json.write("##### JSON tree of all elements in right node:")
+            right_full_json.json(right_dict, expanded=False)
+
+            st.write("##### Flat table of diffs:")
+            try:
+                flattened_diff = flatten_keys(diffs)
+                df = pd.DataFrame.from_dict(flattened_diff, orient='index')
+                st.dataframe(df, use_container_width=True)
+            except Exception as e:
+                st.error(f"Couldn't print as table: {e}")
+        
         
         elif not left_node:
-            st.write(f"Missing from left manifest (brand new node)")
+            st.warning(f"Missing from left manifest (brand new node)")
         
         elif not right_node:
-            st.write(f"Missing from right manifest (deleted node)")
+            st.warning(f"Missing from right manifest (deleted node)")
             st.write("State methods that pick this node up:")
             st.code(state_inclusion_reasons_by_node[unique_id])
 
