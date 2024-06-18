@@ -17,6 +17,23 @@ set_flags(flags)
 from dbt.contracts.graph.manifest import WritableManifest
 from dbt.graph.selector_methods import StateSelectorMethod
 
+from dbt_common.contracts.constraints import ConstraintType
+from dbt.adapters.base import ConstraintSupport
+from typing import Optional, List
+
+import dbt.adapters.factory
+
+def mock_get_adapter_constraint_support(name: Optional[str]) -> List[str]:
+    # return some fixed values as the FACTORY object is empty when running the program
+    return {
+        ConstraintType.check: ConstraintSupport.NOT_SUPPORTED,
+        ConstraintType.not_null: ConstraintSupport.ENFORCED,
+        ConstraintType.unique: ConstraintSupport.NOT_SUPPORTED,
+        ConstraintType.primary_key: ConstraintSupport.NOT_ENFORCED,
+        ConstraintType.foreign_key: ConstraintSupport.NOT_ENFORCED,
+    }
+dbt.adapters.factory.get_adapter_constraint_support = mock_get_adapter_constraint_support
+
 class MockPreviousState:
     def __init__(self, manifest: WritableManifest) -> None:
         self.manifest: Manifest = manifest
