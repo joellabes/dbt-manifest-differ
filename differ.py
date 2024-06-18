@@ -6,6 +6,13 @@ import pandas as pd
 from functions.flatten import flatten_keys
 from functions import tidy
 
+from dbt.cli.flags import Flags
+from dbt.flags import set_flags
+from dbt.cli.types import Command as CliCommand
+
+flags = Flags.from_dict(CliCommand.LIST, {})
+set_flags(flags)
+
 # Minimal viable imports from dbt-core
 from dbt.contracts.graph.manifest import WritableManifest
 from dbt.graph.selector_methods import StateSelectorMethod
