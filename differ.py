@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import jsondiff
 import pandas as pd
@@ -10,6 +11,9 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from functions import tidy
 from functions.flatten import flatten_keys
+
+# we need to make sure that `~/.dbt` exists so that settings Flags doesn't crash
+Path("~/.dbt").expanduser().mkdir(exist_ok=True)
 
 flags = Flags.from_dict(CliCommand.LIST, {})
 set_flags(flags)
