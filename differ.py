@@ -5,10 +5,17 @@ import jsondiff
 import pandas as pd
 from functions.flatten import flatten_keys
 from functions import tidy
+from pathlib import Path
 
 # Minimal viable imports from dbt-core
 from dbt.contracts.graph.manifest import WritableManifest
 from dbt.graph.selector_methods import StateSelectorMethod
+
+# we need to make sure that `~/.dbt` exists so that settings Flags doesn't crash
+Path("~/.dbt").expanduser().mkdir(exist_ok=True)
+
+flags = Flags.from_dict(CliCommand.LIST, {})
+set_flags(flags)
 
 class MockPreviousState:
     def __init__(self, manifest: WritableManifest) -> None:
