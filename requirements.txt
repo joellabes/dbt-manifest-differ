@@ -1,3 +1,4 @@
 streamlit
 dbt-core~=1.7.0
+dbt-common
 jsondiff==2.0.0
