@@ -1,15 +1,21 @@
 from collections.abc import Mapping
 
 
-def flatten_keys(dictionary, separator="."):
-    result = {}
-    for key, value in dictionary.items():
-        if isinstance(value, Mapping):
-            result.update(
-                (str(key) + separator + str(k), v if v is not None else ['N/A'])
-                for k, v in flatten_keys(value, separator).items()
-            )
+def flatten_keys(d, parent_key="", sep="."):
+    items = []
+    for k, v in d.items():
+        if k == "$insert":
+            for sub_k in v.keys():
+                new_key = f"{parent_key}{sep}{sub_k}" if parent_key else sub_k
+                items.append((new_key, ["", "--NEW--"]))
+        elif k == "$delete":
+            for sub_k in v.keys():
+                new_key = f"{parent_key}{sep}{sub_k}" if parent_key else sub_k
+                items.append((new_key, ["--DELETE--", ""]))
         else:
-            result[str(key)] = value
-
-    return result
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(flatten_keys(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+    return dict(items)
