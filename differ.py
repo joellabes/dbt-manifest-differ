@@ -6,6 +6,9 @@ import pandas as pd
 from functions.flatten import flatten_keys
 from functions import tidy
 from pathlib import Path
+from dbt.cli.flags import Flags
+from dbt.cli.types import Command as CliCommand
+from dbt.flags import set_flags
 
 # Minimal viable imports from dbt-core
 from dbt.contracts.graph.manifest import WritableManifest
