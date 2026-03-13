@@ -5,24 +5,14 @@ import jsondiff
 import pandas as pd
 from functions.flatten import flatten_keys
 from functions import tidy
-from pathlib import Path
-from dbt.cli.flags import Flags
-from dbt.cli.types import Command as CliCommand
-from dbt.flags import set_flags
-
-# Minimal viable imports from dbt-core
-from dbt.contracts.graph.manifest import WritableManifest
+from functions.conform import conform_manifest
+from dbt.artifacts.schemas.manifest import WritableManifest
+from dbt.contracts.graph.manifest import Manifest
 from dbt.graph.selector_methods import StateSelectorMethod
 
-# we need to make sure that `~/.dbt` exists so that settings Flags doesn't crash
-Path("~/.dbt").expanduser().mkdir(exist_ok=True)
-
-flags = Flags.from_dict(CliCommand.LIST, {})
-set_flags(flags)
-
 class MockPreviousState:
-    def __init__(self, manifest: WritableManifest) -> None:
-        self.manifest: Manifest = manifest
+    def __init__(self, manifest: Manifest) -> None:
+        self.manifest = manifest
 
 st.set_page_config(layout="wide")
 st.title("dbt Manifest Differ")
@@ -37,8 +27,8 @@ To avoid false positives, define configs in `dbt_project.yml` instead. See [the 
 """, icon = "💡")
 
 left_col, right_col = st.columns(2)
-left_manifest: WritableManifest = None
-right_manifest: WritableManifest = None
+left_manifest: Manifest = None
+right_manifest: Manifest = None
 
 # Copy-paste from https://github.com/dbt-labs/dbt-core/blob/0ab954e1af9bb2be01fa4ebad2df7626249a1fab/core/dbt/graph/selector_methods.py#L676
 state_options = [
@@ -55,11 +45,13 @@ state_method = st.selectbox(label="State comparison method:", options=state_opti
 properties_to_ignore = st.multiselect("Properties to ignore when showing node-level diffs:", ['created_at', 'root_path', 'build_path', 'compiled_path', 'deferred', 'schema', 'checksum', 'compiled_code', 'database', 'relation_name'], default=['created_at', 'checksum', 'database', 'schema', 'relation_name', 'compiled_path', 'root_path', 'build_path'])
 skipped_large_seeds = set()
 
-def load_manifest(file: UploadedFile) -> WritableManifest:
+def load_manifest(file: UploadedFile) -> Manifest:
     data = json.load(file)
     data, large_seeds = tidy.remove_large_seeds(data)
     skipped_large_seeds.update(large_seeds)
-    return WritableManifest.upgrade_schema_version(data)
+    data = conform_manifest(data)
+    writable = WritableManifest.upgrade_schema_version(data)
+    return Manifest.from_writable_manifest(writable)
 
 left_file = left_col.file_uploader("First manifest", type='json', help="Pick your left json file")
 if left_file is not None:
@@ -73,7 +65,7 @@ if left_file and right_file:
     # TODO: also calculate diffs for sources, exposures, semantic_models, metrics
     included_nodes = set(left_manifest.nodes.keys())
     previous_state = MockPreviousState(right_manifest)
-    state_comparator = StateSelectorMethod(left_manifest, previous_state, "")
+    state_comparator = StateSelectorMethod(left_manifest, previous_state, [])
 
     if len(skipped_large_seeds) > 0:
         st.warning(f"Some large seeds couldn't be compared from the manifest alone: {skipped_large_seeds}" )
@@ -140,7 +132,7 @@ if left_file and right_file:
             try:
                 flattened_diff = flatten_keys(diffs)
                 df = pd.DataFrame.from_dict(flattened_diff, orient='index')
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df.astype(str), width='stretch')
             except Exception as e:
                 st.error(f"Couldn't print as table: {e}")
         
