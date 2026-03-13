@@ -8,7 +8,27 @@ from functions import tidy
 from functions.conform import conform_manifest
 from dbt.artifacts.schemas.manifest import WritableManifest
 from dbt.contracts.graph.manifest import Manifest
-from dbt.graph.selector_methods import StateSelectorMethod
+from dbt.graph.selector_methods import StateSelectorMethod as _StateSelectorMethod
+
+
+class PatchedStateSelectorMethod(_StateSelectorMethod):
+    """Workaround for dbt-core bugs when manifests reference macros or
+    use adapter_type in ways that don't work for cross-version comparison."""
+    def recursively_check_macros_modified(self, node, visited_macros):
+        try:
+            return super().recursively_check_macros_modified(node, visited_macros)
+        except KeyError:
+            # Macro exists in one manifest but not the other — treat as modified
+            return True
+
+    def search(self, included_nodes, selector):
+        try:
+            yield from super().search(included_nodes, selector)
+        except TypeError as e:
+            if "adapter_type" in str(e):
+                return
+            raise
+
 
 class MockPreviousState:
     def __init__(self, manifest: Manifest) -> None:
@@ -61,11 +81,19 @@ right_file = right_col.file_uploader("Second manifest", type='json', help="Pick 
 if right_file is not None:
     right_manifest = load_manifest(right_file)
 
+run_results_file = right_col.file_uploader("CI run results (optional)", type='json', help="Upload run_results.json to filter to only the nodes that were built")
+run_results_nodes = None
+if run_results_file is not None:
+    run_results_data = json.load(run_results_file)
+    run_results_nodes = {r['unique_id'] for r in run_results_data.get('results', [])}
+
 if left_file and right_file:
     # TODO: also calculate diffs for sources, exposures, semantic_models, metrics
     included_nodes = set(left_manifest.nodes.keys())
+    if run_results_nodes is not None:
+        included_nodes = included_nodes & run_results_nodes
     previous_state = MockPreviousState(right_manifest)
-    state_comparator = StateSelectorMethod(left_manifest, previous_state, [])
+    state_comparator = PatchedStateSelectorMethod(left_manifest, previous_state, [])
 
     if len(skipped_large_seeds) > 0:
         st.warning(f"Some large seeds couldn't be compared from the manifest alone: {skipped_large_seeds}" )
